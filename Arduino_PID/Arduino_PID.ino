@@ -1,7 +1,7 @@
 #include <LiquidCrystal.h>
 
 /**
- * Mechatronics Lab 9
+ * Mechatronics Lab 6
  *
  * Copyright 2014 Aaron P. Dahlen       APDahlen@gmail.com
  *
@@ -94,7 +94,7 @@
 
 
 
-void MD10C_H_bridge_driver(int32_t drive);
+    void MD10C_H_bridge_driver(int32_t drive);
 
 
 
@@ -103,17 +103,16 @@ void MD10C_H_bridge_driver(int32_t drive);
 void setup(){
 
     AVR_SPI_master_init();
-    init_timer_1_CTC(F_ISR);          // Enable the ISR
-
-
-    pinMode(4, OUTPUT);
+    init_timer_1_CTC(F_ISR);                            // Enable the timer based ISR
 
     USART_init(F_CLK, BAUD_RATE);
     USART_set_terminator(LINE_TERMINATOR);
 
-    pinMode(3, OUTPUT);
-    TCCR2A = _BV(COM2A1) | _BV(COM2B1) | _BV(WGM21) | _BV(WGM20);
-    TCCR2B = _BV(CS20);     //_BV(CS22);            // This register controls PWM frequency
+    /* Use fast PWM using direct registers */
+        pinMode(3, OUTPUT);
+        TCCR2A = _BV(COM2A1) | _BV(COM2B1) | _BV(WGM21) | _BV(WGM20);
+        TCCR2B = _BV(CS20);     //_BV(CS22);            // This register controls PWM frequency
+        OCR2B = 0;
 
     pinMode(MOT_DIR_PIN, OUTPUT);
 
@@ -159,20 +158,20 @@ ISR(TIMER1_COMPA_vect){
 
     static int32_t current_position, last_position;
     static int32_t current_velocity, last_velocity;
-    
+    static uint8_t first_pass = 1;
+
     static uint16_t time_in_state;
-    static uint8_t mot_direction;
-   
- 
-    static int32_t sum_error = 0;
+    static uint8_t setpoint_state;
+
+    static float sum_error = 0;
     float E, P, I, D, PID;
 
     uint8_t tx_SPI_buf[5];
     uint8_t rx_SPI_buf[5];
 
-    digitalWrite(7, HIGH);                                // Signal ISR start.  Use an oscilloscope to verify cooperative time scheduling
+    digitalWrite(ISR_ACTIVE_PIN, HIGH);                                // Signal ISR start.  Use an oscilloscope to verify cooperative time scheduling
 
-    AVR_SPI_master_xfr(5, tx_SPI_buf, rx_SPI_buf);  
+    AVR_SPI_master_xfr(5, tx_SPI_buf, rx_SPI_buf);
     current_position = rx_SPI_buf[1];
     current_position = (current_position << 8) +  rx_SPI_buf[2];
     current_position = (current_position << 8) +  rx_SPI_buf[3];
@@ -181,6 +180,10 @@ ISR(TIMER1_COMPA_vect){
     current_velocity = current_position - last_position;
     last_position = current_position;
 
+    if (first_pass){                        // This if statement cost one hours of lab time!  Be sure
+        first_pass = 0;                     // // to capture "last_positon" before you enter the PID
+        goto end_of_ISR;                    // // routine.  If not the integrator jumps to an astronomically
+    }                                       // // high value on the first pass through this ISR.
 
 /**** Start of PID code ****/
 
@@ -196,19 +199,10 @@ ISR(TIMER1_COMPA_vect){
 
 
 
+
     PID = P + I + D;
-    
-    
-    
-    
-    
-    
-    
-    
+
     MD10C_H_bridge_driver((int32_t)PID);
-
-
-
 
     /* Interface between ISR and main */
         if(request_status){
@@ -223,29 +217,24 @@ ISR(TIMER1_COMPA_vect){
         }
 
 
+    /* Two state setpoint */
+        if(++time_in_state == 400){
+            time_in_state = 0;
+
+            if(setpoint_state == 1){
+                R = 100;
+                setpoint_state = 0;
+            }
+            else{
+                R = 50;
+                setpoint_state = 1;
+            }
+        }
 
 
+end_of_ISR:
 
-
-
-    if(++time_in_state == 400){
-        time_in_state = 0;
-
-        if(mot_direction == 1){
-            R = 100;
-            mot_direction = 0;
-         }
-         else{
-             R = 50;
-             mot_direction = 1;
-         }
-    }
-
-
-
-
-
-    digitalWrite(7, LOW);               // Signal end of ISR
+    digitalWrite(ISR_ACTIVE_PIN, LOW);               // Signal end of ISR
 }
 
 
@@ -264,16 +253,6 @@ void loop(){
 
     char temp_buf[256];
     char line[BUF_LEN];
-
-    uint32_t cnt;
-
-    uint8_t i;
-
-    int num_fields;
-
-    int field;
-
-
 
     while(1){
 
@@ -343,22 +322,7 @@ void init_timer_1_CTC(long desired_ISR_freq){  //FIXME shouldn't F_CLK be a para
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 void MD10C_H_bridge_driver(int32_t drive){            // FIXME put this in the library along with an init section
-
-    static uint8_t last_drive = 0;
 
     if(drive > 250)
         drive = 250;
@@ -382,7 +346,7 @@ void MD10C_H_bridge_driver(int32_t drive){            // FIXME put this in the l
         OCR2B = 0;
         OCR2B = 0;
         OCR2B = 0;
-       digitalWrite(MOT_DIR_PIN, LOW);
-       OCR2B = (uint8_t)(0 - drive);
+        digitalWrite(MOT_DIR_PIN, LOW);
+        OCR2B = (uint8_t)(0 - drive);
     }
 }

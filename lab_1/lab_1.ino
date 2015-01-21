@@ -48,8 +48,8 @@
  *        .
  *    }
  */
- 
- 
+
+
 // AVR GCC libraries for more information see:
 //      http://www.nongnu.org/avr-libc/user-manual/modules.html
 //      https://www.gnu.org/software/libc/manual/
@@ -100,8 +100,8 @@ void setup(){
     tone(BUZ_PIN, 1047);   // C
     delay(200);
     noTone(BUZ_PIN);
-    
-    
+
+
     analogWrite(TRI_LED_R, 255);
     delay(400);
     analogWrite(TRI_LED_R, 0);
@@ -111,9 +111,9 @@ void setup(){
     analogWrite(TRI_LED_B, 255);
     delay(400);
     analogWrite(TRI_LED_B, 0);
-    
+
     delay(1000);
-    
+
     lcd.clear();
 }
 
@@ -159,14 +159,14 @@ void loop(){
     int intensity;
 
     int joy_vert, joy_horz;
-    
+
     static uint32_t next_LCD_update_time = 0;       // Think of the Arduino loop as a function - use static to remember between loops...
-    
+
     uint32_t current_time;
 
  // Board mounted LED (pin 13) on when joystick pushed
- 
-    if(digitalRead(JOY_PUSH_PIN) == JOY_PRES)      
+
+    if(digitalRead(JOY_PUSH_PIN) == JOY_PRES)
         digitalWrite(LED_PIN, HIGH);
     else
         digitalWrite(LED_PIN, LOW);
@@ -174,7 +174,7 @@ void loop(){
 
 // Display the joystick values on the LCD
 
-    current_time = millis();                        
+    current_time = millis();
     if(current_time >= next_LCD_update_time){
         next_LCD_update_time = current_time + 200;
 
